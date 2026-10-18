@@ -1,0 +1,6 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Windows batch files MUST use CRLF line endings or cmd.exe breaks
+*.bat text eol=crlf
+*.cmd text eol=crlf
