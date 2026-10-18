@@ -1,0 +1,12 @@
+# Logs
+*.log
+
+# Windows temporary files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Backups and temporary files
+*.tmp
+*.bak
+*.swp
