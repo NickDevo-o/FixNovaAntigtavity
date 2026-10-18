@@ -83,11 +83,36 @@ class DoHResolver:
                         return ans.get("data")
         return None
 
-async def connect_direct(host: str, port: int, resolver: Optional[DoHResolver] = None) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+# European Smart SNI Reverse Proxies (Bypasses Google Error 400 without VPN)
+SMART_GEO_PROXIES = {
+    "daily-cloudcode-pa.googleapis.com": ["109.120.131.200", "179.254.166.174"],
+    "cloudcode-pa.googleapis.com": ["109.120.131.200", "179.254.166.174"],
+    "cloudaicompanion.googleapis.com": ["109.120.131.200", "179.254.166.174"],
+    "generativelanguage.googleapis.com": ["179.254.166.174", "109.120.131.200"],
+    "aisandbox-pa.googleapis.com": ["179.254.166.174", "109.120.131.200"],
+    "assistant-s3-pa.googleapis.com": ["179.254.166.174", "109.120.131.200"],
+    "proactivebackend-pa.googleapis.com": ["179.254.166.174", "109.120.131.200"],
+    "robinfrontend-pa.googleapis.com": ["179.254.166.174", "109.120.131.200"],
+    "alkalimakersuite-pa.clients6.google.com": ["179.254.166.174", "109.120.131.200"],
+    "webchannel-alkalimakersuite-pa.clients6.google.com": ["179.254.166.174", "109.120.131.200"],
+}
+
+async def connect_direct(host: str, port: int, resolver: Optional[DoHResolver] = None, smart_egress: bool = True) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter, str]:
+    if smart_egress:
+        host_clean = host.lower().rstrip(".")
+        for k, ips in SMART_GEO_PROXIES.items():
+            if host_clean == k or host_clean.endswith("." + k):
+                for tip in ips:
+                    try:
+                        r, w = await asyncio.open_connection(tip, port)
+                        return r, w, f"Smart-Egress ({tip}) [Анти-400]"
+                    except Exception:
+                        continue
     target_host = host
     if resolver:
         target_host = await resolver.resolve(host)
-    return await asyncio.open_connection(target_host, port)
+    r, w = await asyncio.open_connection(target_host, port)
+    return r, w, f"Direct ({target_host})"
 
 async def connect_socks5(socks_host: str, socks_port: int, target_host: str, target_port: int) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     """Connect to target through an upstream SOCKS5 proxy."""
@@ -125,23 +150,70 @@ async def connect_socks5(socks_host: str, socks_port: int, target_host: str, tar
 
     return reader, writer
 
-async def pipe_stream(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, direction: str) -> int:
+def get_split_point(data: bytes, host: str) -> int:
+    """Finds the optimal TCP fragment split point to bypass DPI (SNI Split)"""
+    if len(data) > 5 and data[0] == 0x16:  # TLS Handshake (ClientHello)
+        host_b = host.encode('utf-8')
+        idx = data.find(host_b)
+        if idx != -1 and idx + 2 < len(data):
+            return idx + 2  # Split right inside the SNI domain name
+        return 3  # Fallback: split TLS record header
+    return 0
+
+async def pipe_stream(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, direction: str, host: str = "", enable_dpi_bypass: bool = True) -> int:
     """
-    Pipes bytes with backpressure and micro-pacing for large payloads (>16 KiB).
-    Prevents TCP flow control buffer burst drops (which caused the closed Unlocker bug).
+    Pipes bytes with built-in User-Space DPI Bypass (SNI Splitter) and flow control.
+    Bypasses ISP ТСПУ/DPI without zapret, drivers, or VPNs.
     """
     transferred = 0
+    warned = False
+    is_first_chunk = True
+
+    # Ensure TCP_NODELAY is active for immediate segment transmission
+    sock = writer.get_extra_info('socket')
+    if sock:
+        try:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except Exception:
+            pass
+
     try:
         while not reader.at_eof():
             chunk = await reader.read(CHUNK_SIZE)
             if not chunk:
                 break
-            
+
+            # --- USER-SPACE DPI BYPASS (SNI Splitter) ---
+            if is_first_chunk and direction == "client->remote" and enable_dpi_bypass:
+                is_first_chunk = False
+                split_pos = get_split_point(chunk, host)
+                if split_pos > 0 and split_pos < len(chunk):
+                    part1 = chunk[:split_pos]
+                    part2 = chunk[split_pos:]
+                    
+                    writer.write(part1)
+                    await writer.drain()
+                    await asyncio.sleep(0.002)  # 2ms delay forces OS TCP stack to send separate TCP segment
+                    
+                    writer.write(part2)
+                    await writer.drain()
+
+                    transferred += len(chunk)
+                    logging.info(f"[{GREEN}DPI BYPASS{RESET}] TLS ClientHello for {BOLD}{host}{RESET} split at byte {split_pos} (zapret/VPN not required!)")
+                    continue
+
+            is_first_chunk = False
             writer.write(chunk)
             await writer.drain()
             
             chunk_len = len(chunk)
             transferred += chunk_len
+
+            # Large payload alert for prompt history (>100 KiB)
+            if direction == "client->remote" and transferred > 100 * 1024 and not warned:
+                warned = True
+                print(f"\n{YELLOW}⚠️  [FLOW CONTROL] Large request payload: {transferred/1024:.1f} KiB sent to {host}.{RESET}")
+                print(f"{DIM}   Tip: Use /compact in Antigravity or split giant files to prevent 128 KiB HTTP/2 window overflow!{RESET}\n")
             
             # Flow-control pacing: yield micro-sleep on large chunks
             if chunk_len >= 16384:
@@ -160,7 +232,8 @@ async def pipe_stream(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, 
                         upstream_socks: Optional[Tuple[str, int]] = None,
-                        resolver: Optional[DoHResolver] = None):
+                        resolver: Optional[DoHResolver] = None,
+                        smart_egress: bool = True):
     client_ip, client_port = writer.get_extra_info('peername')[:2]
     stats.total_requests += 1
 
@@ -194,8 +267,9 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             try:
                 if upstream_socks:
                     remote_reader, remote_writer = await connect_socks5(upstream_socks[0], upstream_socks[1], host, port)
+                    route_info = f"SOCKS5 -> {upstream_socks[0]}:{upstream_socks[1]}"
                 else:
-                    remote_reader, remote_writer = await connect_direct(host, port, resolver)
+                    remote_reader, remote_writer, route_info = await connect_direct(host, port, resolver, smart_egress)
             except Exception as e:
                 logging.warning(f"[{YELLOW}UPSTREAM FAIL{RESET}] {host}:{port} -> {e}")
                 writer.write(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
@@ -208,11 +282,11 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             await writer.drain()
 
             stats.active_tunnels += 1
-            logging.info(f"[{GREEN}TUNNEL OK{RESET}] {client_ip}:{client_port} <-> {BOLD}{host}:{port}{RESET} (Active: {stats.active_tunnels})")
+            logging.info(f"[{GREEN}TUNNEL OK{RESET}] {client_ip}:{client_port} <-> {BOLD}{host}:{port}{RESET} [{route_info}] (Active: {stats.active_tunnels})")
 
             # Dual-way streaming with pacing
-            t1 = asyncio.create_task(pipe_stream(reader, remote_writer, "client->remote"))
-            t2 = asyncio.create_task(pipe_stream(remote_reader, writer, "remote->client"))
+            t1 = asyncio.create_task(pipe_stream(reader, remote_writer, "client->remote", host))
+            t2 = asyncio.create_task(pipe_stream(remote_reader, writer, "remote->client", host))
 
             sent, recv = await asyncio.gather(t1, t2, return_exceptions=True)
             stats.active_tunnels -= 1
@@ -241,7 +315,8 @@ async def main():
     parser.add_argument("--bind", default="127.0.0.1", help="Binding interface (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=10809, help="Listening port (default: 10809)")
     parser.add_argument("--socks5", default=None, help="Upstream SOCKS5 proxy host:port (e.g. 127.0.0.1:1080)")
-    parser.add_argument("--doh", action="store_true", help="Enable Cloudflare DoH resolution for Google endpoints")
+    parser.add_argument("--no-doh", action="store_true", help="Disable DoH resolution (use system DNS)")
+    parser.add_argument("--no-smart", action="store_true", help="Disable Smart EU reverse proxy (use direct connection)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging")
     args = parser.parse_args()
 
@@ -253,7 +328,8 @@ async def main():
         shost, sport = args.socks5.split(":") if ":" in args.socks5 else (args.socks5, 1080)
         upstream_socks = (shost, int(sport))
 
-    resolver = DoHResolver() if args.doh else None
+    resolver = None if args.no_doh else DoHResolver()
+    smart_active = not args.no_smart and not upstream_socks
 
     print(f"""
 {CYAN}{BOLD}=============================================================
@@ -261,8 +337,8 @@ async def main():
    Open-Source Proxy & Stream Flow Controller for Antigravity
 ============================================================={RESET}
 {BOLD}Listen Address:{RESET}   http://{args.bind}:{args.port}
-{BOLD}Upstream Route:{RESET}   {"SOCKS5 -> " + args.socks5 if upstream_socks else "Direct + zapret (DPI bypass)"}
-{BOLD}DNS Resolver:{RESET}     {"Cloudflare DoH (1.1.1.1)" if args.doh else "System DNS (zapret friendly)"}
+{BOLD}Smart Egress:{RESET}     {"Smart EU Relay (Bypasses Error 400 without VPN) [Active]" if smart_active else ("SOCKS5 -> " + args.socks5 if upstream_socks else "Direct")}
+{BOLD}DNS Resolver:{RESET}     {"Cloudflare DoH (1.1.1.1) [Active]" if resolver else "System DNS"}
 {BOLD}Buffer Pacing:{RESET}    Active (32 KiB chunks, no 128 KiB burst drops)
 {BOLD}Lockout Policy:{RESET}   No penalties (0s lockout, zero artificial delays)
 -------------------------------------------------------------
@@ -273,7 +349,7 @@ async def main():
 """)
 
     server = await asyncio.start_server(
-        lambda r, w: handle_client(r, w, upstream_socks, resolver),
+        lambda r, w: handle_client(r, w, upstream_socks, resolver, smart_egress=not args.no_smart),
         args.bind, args.port
     )
 

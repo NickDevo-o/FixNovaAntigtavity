@@ -1,0 +1,40 @@
+# =====================================================================
+#             ANTIGRAVITY GATEWAY / UNLOCKER NEXT CONFIG
+# =====================================================================
+
+server:
+  host: "127.0.0.1"
+  port: 10809
+  auto_port: true # Автоподбор соседнего порта (10810..10820), если 10809 занят
+
+upstream:
+  mode: "direct" # "direct" (режим для zapret / WinDivert) или "proxy" (свой прокси)
+  proxy_url: "" # Например: "socks5://127.0.0.1:10808" или "http://127.0.0.1:7890"
+  fallback_to_direct: true # При ошибке 10061 (апстрим упал) мягко переключаться на direct
+  timeout_seconds: 15
+
+dns:
+  enabled: true # Встроенный DoH резолвер (заменяет зависающий ag_dns.exe)
+  provider: "cloudflare" # "cloudflare" (1.1.1.1), "google" (8.8.8.8), "quad9" (9.9.9.9)
+  cache_ttl_minutes: 60
+  custom_doh_urls:
+    - "https://1.1.1.1/dns-query"
+    - "https://dns.google/resolve"
+    - "https://9.9.9.9/dns-query"
+
+stream:
+  buffer_size: 16384 # 16 КиБ чанк
+  enable_throttling: true # Защита от сброса HTTP/2 буфера (SETTINGS_INITIAL_WINDOW_SIZE 128 КиБ)
+  throttle_threshold_kb: 120 # Порог начала микро-пауз при передаче больших контекстов
+  max_rate_kbps: 110 # Сглаживание скорости для предотвращения FLOW_CONTROL_ERROR
+  warn_payload_size_kb: 100 # Предупреждение о необходимости /compact
+  keep_alive_seconds: 15 # Поддержание соединения при размышлениях модели
+
+antigravity:
+  auto_patch_settings: true # Автоматическая установка http.proxy в settings.json IDE
+  auto_kill_language_server: true # Завершение зависших фоновых language_server.exe при старте
+  warmup_on_start: true # Прогрев сокета и проверка связи с Google AI при старте
+
+logging:
+  level: "info"
+  color: true

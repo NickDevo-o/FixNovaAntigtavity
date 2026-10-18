@@ -1,0 +1,40 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 10809,
+    "auto_port": true
+  },
+  "upstream": {
+    "mode": "direct",
+    "proxy_url": "",
+    "fallback_to_direct": true,
+    "timeout_seconds": 15
+  },
+  "dns": {
+    "enabled": true,
+    "provider": "cloudflare",
+    "cache_ttl_minutes": 60,
+    "custom_doh_urls": [
+      "https://1.1.1.1/dns-query",
+      "https://dns.google/resolve",
+      "https://9.9.9.9/dns-query"
+    ]
+  },
+  "stream": {
+    "buffer_size": 16384,
+    "enable_throttling": true,
+    "throttle_threshold_kb": 120,
+    "max_rate_kbps": 110,
+    "warn_payload_size_kb": 100,
+    "keep_alive_seconds": 15
+  },
+  "antigravity": {
+    "auto_patch_settings": true,
+    "auto_kill_language_server": true,
+    "warmup_on_start": true
+  },
+  "logging": {
+    "level": "info",
+    "color": true
+  }
+}
