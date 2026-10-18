@@ -3,10 +3,10 @@
 # 🚀 FixNovaAntigravity
 
 ### Комплексный гайд и набор фиксов для запуска Google Antigravity без VPN
-**zapret (DPI Bypass) + Antigravity Unlocker 2 (v2.23.1)**
+**zapret (DPI Bypass) + Antigravity Unlocker 2 (v2.23.1 / v2.24.0)**
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue.svg)](https://microsoft.com)
-[![Antigravity Unlocker](https://img.shields.io/badge/Unlocker-v2.23.1-orange.svg)](https://t.me)
+[![Antigravity Unlocker](https://img.shields.io/badge/Unlocker-v2.24.0%20%7C%20v2.23.1-orange.svg)](https://t.me)
 [![zapret](https://img.shields.io/badge/zapret-Flowseal-green.svg)](https://github.com/Flowseal/zapret-discord-youtube)
 [![Status](https://img.shields.io/badge/Status-Tested%20%26%20Working-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](#)
@@ -121,11 +121,17 @@ flowchart LR
 
 ---
 
-### Шаг 2. Настройка Antigravity Unlocker 2 (v2.23.1)
+### Шаг 2. Настройка Antigravity Unlocker 2 (v2.23.1 / v2.24.0)
 
-Откройте **Antigravity Unlocker 2** и выставьте параметры строго в соответствии с таблицами:
+Запустите **Antigravity Unlocker 2** (например, `AG_2.24.0.exe`) **от имени Администратора** и выставьте параметры строго в соответствии с таблицами:
 
-#### Основные параметры:
+#### 1. Проверка обнаруженных установок («Найденные установки Antigravity»):
+В версии **2.24.0** Unlocker автоматически сканирует установленные клиенты:
+- 🟢 **Antigravity 2.0** (`%LOCALAPPDATA%\Programs\antigravity`) — десктопный клиент нового поколения.
+- 🟢 **Antigravity IDE** (`%LOCALAPPDATA%\Programs\Antigravity IDE`) — среда разработки на базе VS Code.
+- ⚪ **Antigravity CLI** (`не найдено — укажите путь`) — консольный интерфейс `agy`. **Если вы не пользуетесь CLI из терминала, серый кружок ⚪ — это абсолютно нормально!** Ничего указывать не нужно, на работу 2.0 и IDE это не влияет.
+
+#### 2. Основные параметры:
 | Параметр | Значение | Описание |
 | :--- | :---: | :--- |
 | **Вход в аккаунт из-под санкций** | **ВКЛ** | Разрешает OAuth-авторизацию аккаунтов из РФ/РБ |
@@ -133,7 +139,7 @@ flowchart LR
 | **Прокси из группы** | **ВЫКЛ** | Исключает зависимость от перегруженных публичных прокси |
 | **Автопатч** | **ВКЛ** | Автоматически внедряет необходимые сертификаты и хуки |
 
-#### Настройки для опытных (расширенные):
+#### 3. Настройки для опытных (расширенные):
 | Параметр | Значение | Описание |
 | :--- | :---: | :--- |
 | **Обход через DNS** | **ВКЛ** | Предотвращает спуфинг DNS со стороны провайдера |
