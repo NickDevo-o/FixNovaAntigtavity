@@ -172,7 +172,9 @@ flowchart LR
 
 - [`scripts/add-to-zapret.bat`](scripts/add-to-zapret.bat) — автоматическое и безопасное добавление доменов Google AI в ваш существующий `list-general.txt` без удаления ваших сайтов (Discord, YouTube) и без дубликатов.
 - [`scripts/fix-unlocker-service.bat`](scripts/fix-unlocker-service.bat) — принудительный перезапуск зависшей службы обхода (`ag_dns`), если кнопка «Починить» в Unlocker не срабатывает.
-- [`scripts/clear-antigravity-cache.bat`](scripts/clear-antigravity-cache.bat) — сброс кэша браузерного движка, устранение черного экрана (`GPUCache`), завершение зависших `language_server.exe` и очистка битых токенов сессий.
+- [`scripts/clear-antigravity-cache.bat`](scripts/clear-antigravity-cache.bat) — умная очистка с выбором режима:
+  - **Режим [1] (Безопасный):** устраняет черный экран (`GPUCache`), завершает зависшие `language_server.exe` и `ag_dns.exe` **БЕЗ разлогина и БЕЗ потери истории чатов**!
+  - **Режим [2] (Полный сброс):** удаляет битые токены авторизации и сессии (требуется повторный логин в Google), если аккаунт намертво заблокирован ошибкой 400.
 - [`scripts/check-ports.bat`](scripts/check-ports.bat) — экспресс-проверка готовности системы:
   - Запущен ли процесс `winws.exe` (zapret);
   - Статус `ag_dns.exe` и `language_server.exe`;
