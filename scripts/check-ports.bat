@@ -16,8 +16,15 @@ if "%ERRORLEVEL%"=="0" (
     echo   [OK] zapret (winws.exe) активен.
 ) else (
     echo   [!] ВНИМАНИЕ: zapret (winws.exe) НЕ найден в процессах!
-    echo       Запустите zapret через service.bat или preset.bat от имени Администратора.
+    echo       Запустите zapret через service.bat от имени Администратора.
     set /a FAILURES+=1
+)
+
+tasklist /FI "IMAGENAME eq ag_dns.exe" 2>NUL | find /I "ag_dns">NUL
+if "%ERRORLEVEL%"=="0" (
+    echo   [OK] Служба DNS Unlocker (ag_dns.exe) активна.
+) else (
+    echo   [i] ag_dns.exe не активен (запустится при старте Unlocker).
 )
 
 tasklist /FI "IMAGENAME eq Antigravity*" 2>NUL | find /I "Antigravity">NUL
@@ -26,18 +33,25 @@ if "%ERRORLEVEL%"=="0" (
 ) else (
     echo   [i] Antigravity сейчас не запущен (это нормально перед настройкой).
 )
+
+tasklist /FI "IMAGENAME eq language_server.exe" 2>nul | find /I "language_server">nul
+if "%ERRORLEVEL%"=="0" (
+    echo   [!] Обнаружен фоновый language_server.exe.
+    echo       Если в новых чатах появляется 'Unknown: Agent execution terminated',
+    echo       запустите scripts\clear-antigravity-cache.bat для его перезапуска.
+)
 echo.
 
 :: 2. Проверка порта 10809
 echo [2/5] Проверка локального порта 10809 (HTTP-прокси)...
 netstat -ano | findstr /R /C:":10809 .*LISTENING" >nul
 if "%ERRORLEVEL%"=="0" (
-    echo   [OK] Порт 10809 прослушивается (сервер/прокси запущен).
+    echo   [OK] Порт 10809 прослушивается.
 ) else (
-    echo   [!] ВНИМАНИЕ: Порт 10809 НЕ прослушивается!
-    echo       Убедитесь, что Antigravity Unlocker 2 запущен и настроен на этот порт,
-    echo       либо встроенный выход Unlocker активен.
-    set /a FAILURES+=1
+    echo   [i] Порт 10809 сейчас не слушается.
+    echo       ВАЖНО: Если у вас нет запущенного локального прокси (Xray/v2ray),
+    echo       в Unlocker поле "Свой HTTP-прокси" можно ОЧИСТИТЬ (оставить пустым),
+    echo       чтобы избежать ошибки 'os error 10061 (Подключение отвергнуто)'.
 )
 echo.
 
@@ -63,17 +77,17 @@ powershell -NoProfile -Command ^
     "try { $ip = [System.Net.Dns]::GetHostAddresses('alkalicore-pa.clients6.google.com'); Write-Host '  [OK] alkalicore-pa.clients6.google.com -> ' $ip[0].IPAddressToString } catch { Write-Host '  [!] Ошибка разрешения DNS: alkalicore-pa.clients6.google.com' -ForegroundColor Red }"
 echo.
 
-:: 5. Тест соединения через локальный прокси
-echo [5/5] Тестирование доступности прокси 127.0.0.1:10809...
+:: 5. Тест соединения с локальным сокетом
+echo [5/5] Тестирование доступности локального сокета 127.0.0.1:10809...
 powershell -NoProfile -Command ^
-    "try { $tcp = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 10809); $tcp.Close(); Write-Host '  [OK] TCP-соединение с 127.0.0.1:10809 успешно установлено.' } catch { Write-Host '  [!] Не удалось подключиться по TCP к 127.0.0.1:10809. ' $_.Exception.Message -ForegroundColor Yellow }"
+    "try { $tcp = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 10809); $tcp.Close(); Write-Host '  [OK] TCP-соединение с 127.0.0.1:10809 успешно установлено.' } catch { Write-Host '  [i] 127.0.0.1:10809 не отвечает (это нормально, если вы используете встроенные выходы Unlocker).' -ForegroundColor Gray }"
 echo.
 
 echo ======================================================================
 if %FAILURES% gtr 0 (
     echo ОБНАРУЖЕНЫ ПРЕДУПРЕЖДЕНИЯ (%FAILURES%). Сверьтесь с TROUBLESHOOTING.md!
 ) else (
-    echo ВСЕ БАЗОВЫЕ ПРОВЕРКИ ПРОЙДЕНЫ УСПЕШНО!
+    echo БАЗОВЫЕ ПРОВЕРКИ ЗАВЕРШЕНЫ.
 )
 echo ======================================================================
 echo.

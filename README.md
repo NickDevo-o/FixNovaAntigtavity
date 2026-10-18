@@ -147,43 +147,49 @@ flowchart LR
 | **Локальный прокси** | **ВЫКЛ** | Отключает лишний локальный форвардинг |
 | **Встроенные выходы** | **ВКЛ** | Активирует внутренние оптимизированные маршруты |
 | **Сверять TLS** | **ВКЛ** | Предотвращает разрыв соединений при проверке сертификатов |
-| **Свой HTTP-прокси** | `https://127.0.0.1:10809` | Локальная конечная точка проксирования |
+| **Свой HTTP-прокси** | `https://127.0.0.1:10809` *(или пусто)* | См. важное примечание ниже |
 
 > [!WARNING]
-> Обратите внимание на протокол `https://` в поле своего прокси: строка должна иметь вид: `https://127.0.0.1:10809`.
+> **ПРИМЕЧАНИЕ ПО ПОЛЮ «СВОЙ HTTP-ПРОКСИ»:**  
+> - Если у вас запущен собственный локальный туннель (Xray / v2ray / Clash / sing-box на порту 10809), укажите строго `https://127.0.0.1:10809`.  
+> - **Если у вас НЕТ отдельного прокси-сервера:** **ОСТАВЬТЕ ЭТО ПОЛЕ ПУСТЫМ!** В противном случае Unlocker будет пытаться подключиться к несуществующему порту и выдаст ошибку `os error 10061 (Подключение отвергнуто)`. При пустом поле Unlocker работает через свои встроенные выходы напрямую с zapret.
 
 ---
 
 ### Шаг 3. Запуск и проверка Antigravity
 
-1. Перезапустите приложение **Antigravity**.
+1. Перезапустите приложение **Antigravity** (2.0 или IDE).
 2. Убедитесь, что в трее активны и `zapret`, и `Antigravity Unlocker 2`.
 3. Откройте чат с ИИ и отправьте тестовое сообщение.
 4. Ответ модели должен приходить быстро, без ожидания и без ошибок 400/403.
 
 ---
 
-## 🧰 Встроенные утилиты диагностики
+## 🧰 Встроенные утилиты диагностики и ремонта
 
 В папку [`scripts/`](scripts/) включены вспомогательные скрипты:
 
 - [`scripts/add-to-zapret.bat`](scripts/add-to-zapret.bat) — автоматическое и безопасное добавление доменов Google AI в ваш существующий `list-general.txt` без удаления ваших сайтов (Discord, YouTube) и без дубликатов.
-- [`scripts/check-ports.bat`](scripts/check-ports.bat) — экспресс-проверка:
+- [`scripts/fix-unlocker-service.bat`](scripts/fix-unlocker-service.bat) — принудительный перезапуск зависшей службы обхода (`ag_dns`), если кнопка «Починить» в Unlocker не срабатывает.
+- [`scripts/clear-antigravity-cache.bat`](scripts/clear-antigravity-cache.bat) — сброс кэша браузерного движка, устранение черного экрана (`GPUCache`), завершение зависших `language_server.exe` и очистка битых токенов сессий.
+- [`scripts/check-ports.bat`](scripts/check-ports.bat) — экспресс-проверка готовности системы:
   - Запущен ли процесс `winws.exe` (zapret);
-  - Слушается ли порт `10809`;
+  - Статус `ag_dns.exe` и `language_server.exe`;
+  - Проверка порта `10809` и предупреждение об `os error 10061`;
   - Не остались ли включенными фоновые VPN-адаптеры (WireGuard, TUN, WARP);
   - Доступность DNS для серверов `generativelanguage.googleapis.com`.
-- [`scripts/clear-antigravity-cache.bat`](scripts/clear-antigravity-cache.bat) — сброс кэша (`Cache`, `GPUCache`, `IndexedDB`, `Session Storage`) и старых токенов авторизации Antigravity (безопасный аналог `antigravity-cleaner`).
 
 ---
 
 ## ❓ Что делать, если все еще не работает?
 
 👉 **Полное руководство со всеми редкими кейсами доступно в файле: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**:
+- Ошибка в новых чатах `Unknown: Agent execution terminated due to error` (зависший `language_server.exe`);
+- Сбой кнопки «Починить» в Unlocker (`ag_dns`);
+- Черный экран при запуске Antigravity;
+- Ошибки `os error 10061` и почему упала группа Nova (404 на `cloudcode-pa`);
 - Ошибки `WinDivert (code 5 / 1753)` и конфликты с античитами (Vanguard / FaceIT);
-- Ошибки `ECONNREFUSED 127.0.0.1:10809`;
-- Настройка шифрованного DoH (DNS over HTTPS) в Windows;
-- Проблемы с IPv6 и сертификатами безопасности.
+- Настройка шифрованного DoH (DNS over HTTPS) в Windows.
 
 ---
 
@@ -197,8 +203,10 @@ FixNovaAntigravity/
 │   ├── list-general.txt           # Базовый список доменов (Google AI, Cloudflare, DoH)
 │   └── list-extended.txt          # Расширенный список (включая Google OAuth, CloudCode)
 └── scripts/
-    ├── check-ports.bat            # Скрипт проверки сети и портов
-    └── clear-antigravity-cache.bat # Скрипт безопасной очистки кэша клиента
+    ├── add-to-zapret.bat          # Добавление доменов в zapret без дубликатов
+    ├── check-ports.bat            # Скрипт проверки сети, портов и процессов
+    ├── clear-antigravity-cache.bat # Полная очистка кэша, сессий и зависших процессов
+    └── fix-unlocker-service.bat   # Принудительный перезапуск зависшей службы ag_dns
 ```
 
 ---
